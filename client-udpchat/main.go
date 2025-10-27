@@ -32,7 +32,7 @@ func main() {
 	if err != nil { fmt.Printf("(rdv)address parse failed: %v\n", err) }
 
 	rdvConn, err := net.ListenUDP("udp4", laddr)
-	if err != nil { fmt.Printf("(rdv)binding failed: %v\n", err) }
+	if err != nil { fmt.Printf("(rdv)binding failed: %v\n", err); return }
 
 	peerIP := string(waitForRdvReply(rdvConn, &rdvAddr))
 	
@@ -91,8 +91,16 @@ func main() {
 		if len(input) == 0 { continue }
 
 		// Create UDP socket and bind to local port
-		_, err = conn.WriteToUDP([]byte(input), remote)
-		if err != nil { fmt.Printf("(main)sending failed: %v\n", err) }
+
+		n, err := conn.WriteToUDP([]byte(input), remote)
+		if err != nil { fmt.Printf("(main)sending [%d bytes] failed: %v\n", n, err) }
+
+		if input == "/q" {
+			err := conn.Close()
+			if err != nil { fmt.Printf("(main)could not close connection\nports 50001 and 50002 possibly remain bound: %v\n", err) }
+			fmt.Printf("\n>> Good bye!\n")
+			return
+		}
 
 		fmt.Printf("> ")
 	}
@@ -117,7 +125,11 @@ func listenToPort(port string) error {
 		if Debug {
 			fmt.Printf("(%s)", addr)
 		}
-		fmt.Printf("%50s <\n", string(b[:n]))
+		if string(b[:n]) == "/q" {
+			fmt.Println(" >> Peer disappear - /q to follow")
+			return nil
+		}
+		fmt.Printf("\n%50s <\n", string(b[:n]))
 	}
 }
 
