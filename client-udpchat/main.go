@@ -5,6 +5,7 @@ import (
 	"os"
 	"net"
 	"bufio"
+	//"strings"
 )
 
 var Debug bool
@@ -16,10 +17,13 @@ func main() {
 	fmt.Println(" >> connecting to rendezvous")
 	fmt.Println("    please waiting          ")
 
+
 	rdvAddr := net.UDPAddr{
 		IP: net.ParseIP("34.172.225.134"),
 		Port: 55585,
 	}
+
+
 
 	Debug = false
 
@@ -32,10 +36,11 @@ func main() {
 	rdvConn, err := net.ListenUDP("udp4", laddr)
 	if err != nil { fmt.Printf("(rdv)binding failed: %v\n", err) }
 
-
-
 	peerIP := string(waitForRdvReply(rdvConn, &rdvAddr))
-	fmt.Printf(" >> Peer found: %s\n", peerIP)
+	
+	fmt.Printf("bytes: [%v]\n", []byte(peerIP))
+
+	fmt.Printf(" >> Peer found: [%s]\n", peerIP)
 	fmt.Printf(" >> source port: \t50001\n")
 	fmt.Printf(" >> dest port: \t50002\n")
 
@@ -48,7 +53,7 @@ func main() {
 	scanner.Scan()
 
 	// Punch hole with some message
-	fmt.Printf("pow\n")
+	fmt.Printf(" >> punching hole\n")
 
 	laddr, err = net.ResolveUDPAddr("udp4", "0.0.0.0:" + sPort)
 	if err != nil { fmt.Printf("(punch)address parse failed: %v\n", err) }
@@ -56,17 +61,21 @@ func main() {
 	pconn, err := net.ListenUDP("udp4", laddr)
 	if err != nil { fmt.Printf("(punch)binding failed: %v\n", err) }
 
-	premote, _ := net.ResolveUDPAddr("udp4", peerIP + ":" + dPort)
+	premote, err := net.ResolveUDPAddr("udp4", peerIP + ":" + dPort)
 	if err != nil { fmt.Printf("(punch)address parse failed: %v\n", err) }
+
+	//fmt.Printf(" >> (confirm)Remote IP: [%s][%d]\n", premote.IP.String(), premote.Port)
 
 	pconn.WriteToUDP([]byte("punch"), premote)
 	pconn.Close()
 
 
 	go listenToPort(sPort)
-	fmt.Println("Listening...")
+	fmt.Printf(" >> Listening...\n\n")
+	fmt.Println("--- Ready, set, chat! ---")
+	fmt.Println("--- (ctrl-c to quit)  ---")
 
-	fmt.Printf("> ")
+	fmt.Printf("\n> ")
 
 
 	// Loop sending msgs from stdin
@@ -76,20 +85,15 @@ func main() {
 	conn, err := net.ListenUDP("udp4", addr)
 	if err != nil { fmt.Printf("(main)binding failed: %v\n", err) }
 
-	remote := net.UDPAddr{
-		IP: net.ParseIP(peerIP),
-		Port: 50001,
-	}
-	fmt.Printf(" >> (confirm)Remote IP: [%s][%d]\n", remote.IP.String(), remote.Port)
-	//remote, err := net.ResolveUDPAddr("udp4", peerIP + ":" + sPort)
-	//if err != nil { fmt.Printf("(main)address parse failed: %v\n", err) }
+	remote, err := net.ResolveUDPAddr("udp4", peerIP + ":" + sPort)
+	if err != nil { fmt.Printf("(main)address parse failed: %v\n", err) }
 
 	for scanner.Scan() {
 		input := scanner.Text()
 		if len(input) == 0 { continue }
 
 		// Create UDP socket and bind to local port
-		_, err = conn.WriteToUDP([]byte(input), &remote)
+		_, err = conn.WriteToUDP([]byte(input), remote)
 		if err != nil { fmt.Printf("(main)sending failed: %v\n", err) }
 
 		fmt.Printf("> ")
@@ -115,7 +119,7 @@ func listenToPort(port string) error {
 		if Debug {
 			fmt.Printf("(%s)", addr)
 		}
-		fmt.Printf("friend: %s\n", string(b[:n]))
+		fmt.Printf("%50s <\n", string(b[:n]))
 	}
 }
 
@@ -128,12 +132,13 @@ func waitForRdvReply(conn *net.UDPConn, rdvAddr *net.UDPAddr) []byte {
 	conn.WriteToUDP([]byte("69"), rdvAddr)
 
 	for {
-		_, _, err := conn.ReadFromUDP(b)
+		n, _, err := conn.ReadFromUDP(b)
 		if err != nil { fmt.Printf("(rdv-reply)read error: %v\n", err) }
 
-		fmt.Printf(" >> Rendezvous replied: %s\n", string(b))
+		fmt.Printf(" >> Rendezvous replied: %s\n", string(b[:n]))
 
-		if len(b) > 1 { break }
+		if len(b) > 1 {
+			return b[:n]
+		}
 	}
-	return b
 }
