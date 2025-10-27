@@ -41,9 +41,9 @@ func main() {
 	//                  So the IP was padded with zeroes.)
 	//fmt.Printf("bytes: [%v]\n", []byte(peerIP))
 
-	fmt.Printf(" >> Peer found: [%s]\n", peerIP)
-	fmt.Printf(" >> source port: \t50001\n")
-	fmt.Printf(" >> dest port: \t50002\n")
+	fmt.Printf(" >> Peer found: \t[%s]\n", peerIP)
+	fmt.Printf(" >> source port:\t50001\n")
+	fmt.Printf(" >> dest port:  \t50002\n")
 
 
 	            // After Server Connect
@@ -126,7 +126,7 @@ func listenToPort(port string) error {
 			fmt.Printf("(%s)", addr)
 		}
 		if string(b[:n]) == "/q" {
-			fmt.Println(" >> Peer disappear - /q to follow")
+			fmt.Println(" --- Peer left the chat: do /q to follow --- ")
 			return nil
 		}
 		fmt.Printf("\n%50s <\n", string(b[:n]))
