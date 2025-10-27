@@ -76,15 +76,20 @@ func main() {
 	conn, err := net.ListenUDP("udp4", addr)
 	if err != nil { fmt.Printf("(main)binding failed: %v\n", err) }
 
-	remote, err := net.ResolveUDPAddr("udp4", peerIP + ":" + sPort)
-	if err != nil { fmt.Printf("(main)address parse failed: %v\n", err) }
+	remote := net.UDPAddr{
+		IP: net.ParseIP(peerIP),
+		Port: 50001,
+	}
+	fmt.Printf(" >> (confirm)Remote IP: [%s][%d]\n", remote.IP.String(), remote.Port)
+	//remote, err := net.ResolveUDPAddr("udp4", peerIP + ":" + sPort)
+	//if err != nil { fmt.Printf("(main)address parse failed: %v\n", err) }
 
 	for scanner.Scan() {
 		input := scanner.Text()
 		if len(input) == 0 { continue }
 
 		// Create UDP socket and bind to local port
-		_, err = conn.WriteToUDP([]byte(input), remote)
+		_, err = conn.WriteToUDP([]byte(input), &remote)
 		if err != nil { fmt.Printf("(main)sending failed: %v\n", err) }
 
 		fmt.Printf("> ")

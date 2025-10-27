@@ -49,8 +49,8 @@ func main() {
 			break
 		}
 	}
-	c0 := fmt.Sprintf("%s:%d", clients[0].IP.String(), clients[0].Port)
-	c1 := fmt.Sprintf("%s:%d", clients[1].IP.String(), clients[1].Port)
+	c0 := fmt.Sprintf("%s", clients[0].IP.String())
+	c1 := fmt.Sprintf("%s", clients[1].IP.String())
 	conn.WriteToUDP([]byte(c1), &clients[0])	
 	conn.WriteToUDP([]byte(c0), &clients[1])	
 }
