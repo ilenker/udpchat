@@ -17,13 +17,11 @@ func main() {
 	fmt.Println(" >> connecting to rendezvous")
 	fmt.Println("    please waiting          ")
 
-
+	// Rendezvous server address
 	rdvAddr := net.UDPAddr{
 		IP: net.ParseIP("34.172.225.134"),
 		Port: 55585,
 	}
-
-
 
 	Debug = false
 
@@ -38,7 +36,10 @@ func main() {
 
 	peerIP := string(waitForRdvReply(rdvConn, &rdvAddr))
 	
-	fmt.Printf("bytes: [%v]\n", []byte(peerIP))
+	// Printing the bytes here really helped reveal why the 
+	// IP didn't parse (I was trying to parse a []byte of size 512,
+	//                  So the IP was padded with zeroes.)
+	//fmt.Printf("bytes: [%v]\n", []byte(peerIP))
 
 	fmt.Printf(" >> Peer found: [%s]\n", peerIP)
 	fmt.Printf(" >> source port: \t50001\n")
@@ -48,9 +49,6 @@ func main() {
 	            // After Server Connect
 
 	scanner := bufio.NewScanner(os.Stdin)
-
-	// Block for punch
-	scanner.Scan()
 
 	// Punch hole with some message
 	fmt.Printf(" >> punching hole\n")
@@ -135,7 +133,7 @@ func waitForRdvReply(conn *net.UDPConn, rdvAddr *net.UDPAddr) []byte {
 		n, _, err := conn.ReadFromUDP(b)
 		if err != nil { fmt.Printf("(rdv-reply)read error: %v\n", err) }
 
-		fmt.Printf(" >> Rendezvous replied: %s\n", string(b[:n]))
+		//fmt.Printf(" >> Rendezvous replied: %s\n", string(b[:n]))
 
 		if len(b) > 1 {
 			return b[:n]
