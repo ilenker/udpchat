@@ -1,0 +1,34 @@
+package main
+
+import (
+	"log"
+	"net"
+)
+
+func main() {
+	log.Println("hello world")
+
+	ln, err := net.Listen("tcp", ":7777")
+	if err != nil {
+		log.Fatalf("Error creating listener: %v\n", err)
+	}
+
+	log.Println("Listening to TCP connections on port: 7777 ...")
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			log.Printf("Error creating connection: %v\n", err)
+		}
+		log.Printf("Connection accepted: %v\n", conn.RemoteAddr())
+		go handleConnection(conn)
+	}
+}
+
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+	n, err := conn.Write([]byte("Hello from server\n"))
+	if err != nil {
+		log.Printf("Could not write to connection (%d): %v\n", n, err)
+	}
+}

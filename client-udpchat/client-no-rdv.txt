@@ -1,0 +1,101 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"net"
+	"bufio"
+)
+
+var Debug bool
+
+func main() {
+	if len(os.Args) < 4 {
+		fmt.Println("usage: <sPort> <rIP> <rPort> -d <-optional(debug) \n")
+		return
+	}
+	Debug = false
+
+	sPort := os.Args[1]
+	rIP   := os.Args[2]
+	rPort := os.Args[3]
+
+	if len(os.Args) == 5 {
+		dFlag := os.Args[4]
+		if dFlag == "-d" {
+			Debug = true
+		}
+	}	
+	fmt.Println("Press any key to punch")
+
+
+	scanner := bufio.NewScanner(os.Stdin)
+
+	// Block for punch
+	scanner.Scan()
+
+	// Punch hole with some message
+	fmt.Printf("pow\n")
+	paddr, err := net.ResolveUDPAddr("udp4", "0.0.0.0:" + sPort)
+	if err != nil { fmt.Printf("address parse failed: %v\n", err) }
+
+	pconn, err := net.ListenUDP("udp4", paddr)
+	if err != nil { fmt.Printf("binding failed: %v\n", err) }
+
+	premote, _ := net.ResolveUDPAddr("udp4", rIP + ":" + rPort)
+	if err != nil { fmt.Printf("address parse failed: %v\n", err) }
+
+	pconn.WriteToUDP([]byte("punch"), premote)
+	pconn.Close()
+
+
+	go listenToPort(sPort)
+	fmt.Println("Listening...")
+
+	fmt.Printf("> ")
+
+
+	// Loop sending msgs from stdin
+	addr, err := net.ResolveUDPAddr("udp4", "0.0.0.0:" + rPort)
+	if err != nil { fmt.Printf("address parse failed: %v\n", err) }
+
+	conn, err := net.ListenUDP("udp4", addr)
+	if err != nil { fmt.Printf("binding failed: %v\n", err) }
+
+	remote, err := net.ResolveUDPAddr("udp4", rIP + ":" + sPort)
+	if err != nil { fmt.Printf("address parse failed: %v\n", err) }
+
+	for scanner.Scan() {
+		input := scanner.Text()
+		if len(input) == 0 { continue }
+
+		// Create UDP socket and bind to local port
+		_, err = conn.WriteToUDP([]byte(input), remote)
+		if err != nil { fmt.Printf("sending failed: %v\n", err) }
+
+		fmt.Printf("> ")
+	}
+
+}
+
+func listenToPort(port string) error {
+	laddr, err := net.ResolveUDPAddr("udp4", "0.0.0.0:" + port)
+	if err != nil { fmt.Printf("listener parse failed: %v\n", err) }
+
+	conn, err := net.ListenUDP("udp4", laddr)
+	if err != nil { fmt.Printf("listener binding failed: %v\n", err) }
+
+	defer conn.Close()
+
+	b := make([]byte, 512)
+
+	for {
+		n, addr, err := conn.ReadFromUDP(b)
+		if err != nil { fmt.Printf("listener read error: %v\n", err) }
+
+		if Debug {
+			fmt.Printf("(%s)", addr)
+		}
+		fmt.Printf("friend: %s\n", string(b[:n]))
+	}
+}
