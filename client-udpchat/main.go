@@ -12,8 +12,10 @@ var Debug bool
 
 
 func main() {
+	version := "v0.1"
 
 	fmt.Println("==== Welcome! UPD chatter! ====")
+	fmt.Printf("                          %s   ", version)
 	fmt.Println(" >> connecting to rendezvous")
 	fmt.Println("    please waiting          ")
 
@@ -95,12 +97,12 @@ func main() {
 		n, err := conn.WriteToUDP([]byte(input), remote)
 		if err != nil { fmt.Printf("(main)sending [%d bytes] failed: %v\n", n, err) }
 
-		//if input == "/q" {
-		//	err := conn.Close()
-		//	if err != nil { fmt.Printf("(main)could not close connection\nports 50001 and 50002 possibly remain bound: %v\n", err) }
-		//	fmt.Printf("\n>> Good bye!\n")
-		//	return
-		//}
+		if input == "/q" {
+			err := conn.Close()
+			if err != nil { fmt.Printf("(main)could not close connection\nports 50001 and 50002 possibly remain bound: %v\n", err) }
+			fmt.Printf("\n>> Good bye!\n")
+			return
+		}
 
 		fmt.Printf("> ")
 	}
@@ -125,10 +127,6 @@ func listenToPort(port string) error {
 		if Debug {
 			fmt.Printf("(%s)", addr)
 		}
-		//if string(b[:n]) == "/q" {
-		//	fmt.Println(" --- Peer left the chat: do /q to follow --- ")
-		//	return nil
-		//}
 		fmt.Printf("\n%50s <\n", string(b[:n]))
 	}
 }
