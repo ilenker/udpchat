@@ -5,17 +5,25 @@ import (
 	"os"
 	"net"
 	"bufio"
-	//"strings"
+	"golang.org/x/term"
 )
 
 var Debug bool
 
+type TermInfo struct {
+	fd int
+	Cols int
+	Rows int
+}
+
 
 func main() {
-	version := "v0.1"
+	version := "v0.2"
+
+	termInfo := TermInfo{}
 
 	fmt.Println("==== Welcome! UPD chatter! ====")
-	fmt.Printf("                          %s   ", version)
+	fmt.Printf("                           %s   \n", version)
 	fmt.Println(" >> connecting to rendezvous")
 	fmt.Println("    please waiting          ")
 
@@ -44,12 +52,11 @@ func main() {
 	//fmt.Printf("bytes: [%v]\n", []byte(peerIP))
 
 	fmt.Printf(" >> Peer found: \t[%s]\n", peerIP)
-	fmt.Printf(" >> source port:\t50001\n")
-	fmt.Printf(" >> dest port:  \t50002\n")
+	fmt.Printf("    source port:\t50001\n")
+	fmt.Printf("    dest port:  \t50002\n")
 
 
 	            // After Server Connect
-
 	scanner := bufio.NewScanner(os.Stdin)
 
 	// Punch hole with some message
@@ -73,7 +80,9 @@ func main() {
 	go listenToPort(sPort)
 	fmt.Printf(" >> Listening...\n\n")
 	fmt.Println("--- Ready, set, chat! ---")
-	fmt.Println("--- (ctrl-c to quit)  ---")
+	fmt.Println("---    /q to quit     ---")
+
+	initTerminal(&termInfo)
 
 	fmt.Printf("\n> ")
 
@@ -98,13 +107,19 @@ func main() {
 		if err != nil { fmt.Printf("(main)sending [%d bytes] failed: %v\n", n, err) }
 
 		if input == "/q" {
+			conn.WriteToUDP([]byte(" >> Peer disconnected"), remote)
 			err := conn.Close()
 			if err != nil { fmt.Printf("(main)could not close connection\nports 50001 and 50002 possibly remain bound: %v\n", err) }
 			fmt.Printf("\n>> Good bye!\n")
+			restoreTerminal()
 			return
 		}
 
-		fmt.Printf("> ")
+		
+		fmt.Printf("\033[1F\n> %s", input)// Print user message above input field
+		fmt.Printf("\033[%d;0H", termInfo.Rows)  // Move to bottom left
+		fmt.Printf("\033[0K")           // Clear to EOL
+		fmt.Printf("> ")                // Print Cursor
 	}
 
 }
@@ -127,7 +142,10 @@ func listenToPort(port string) error {
 		if Debug {
 			fmt.Printf("(%s)", addr)
 		}
-		fmt.Printf("\n%50s <\n", string(b[:n]))
+		fmt.Printf("\0337")
+		fmt.Printf("\033[1A")
+		fmt.Printf("\n%50s <", string(b[:n]))
+		fmt.Printf("\0338")
 	}
 }
 
@@ -149,4 +167,29 @@ func waitForRdvReply(conn *net.UDPConn, rdvAddr *net.UDPAddr) []byte {
 			return b[:n]
 		}
 	}
+}
+
+func initTerminal(termInfo *TermInfo) {
+	cols, rows, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil { fmt.Printf("(init)failed to get terminal size: %v\n", err) }
+
+	//fmt.Printf("Cols: %d\n", cols)
+	//fmt.Printf("Rows: %d\n", rows)
+
+	termInfo.Cols = cols
+	termInfo.Rows = rows
+
+
+	// Save Cursor position
+	fmt.Printf("\0337")
+
+	// Set scrollable region:
+	fmt.Printf("\033[0;%dr", rows - 1)
+
+	// Move the cursor to bottom
+	fmt.Printf("\033[%d;0H", rows)
+}
+
+func restoreTerminal() {
+	//fmt.Printf("\0338")
 }
