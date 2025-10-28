@@ -18,8 +18,8 @@ type TermInfo struct {
 
 
 func main() {
-	version := "v0.2"
-
+	enableVirtualTerminalProcessing()
+	version := "v0.3"
 	termInfo := TermInfo{}
 
 	fmt.Println("==== Welcome! UPD chatter! ====")
