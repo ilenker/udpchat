@@ -71,10 +71,34 @@ func main() {
 			break
 		}
 	}
-	c0pub  := fmt.Sprintf("peerPublicEndpoint:%s", clients[0].pubEndpoint.IP.String())
-	c0priv := fmt.Sprintf("peerPrivateEndpoint:%s", clients[0].privEndpoint.IP.String())
-	c1pub  := fmt.Sprintf("peerPublicEndpoint:%s", clients[1].pubEndpoint.IP.String())
-	c1priv := fmt.Sprintf("peerPrivateEndpoint:%s", clients[1].privEndpoint.IP.String())
+	c0pub  := fmt.Sprintf("peerPublicEndpoint:%s:%d",
+		clients[0].pubEndpoint.IP.String(),
+		clients[0].pubEndpoint.Port,)
+	c0priv := fmt.Sprintf("peerPrivateEndpoint:%s:%d",
+		clients[0].privEndpoint.IP.String(),
+		clients[0].privEndpoint.Port)
+	c1pub  := fmt.Sprintf("peerPublicEndpoint:%s:%d",
+		clients[1].pubEndpoint.IP.String(),
+		clients[1].pubEndpoint.Port)
+	c1priv := fmt.Sprintf("peerPrivateEndpoint:%s:%d",
+		clients[1].privEndpoint.IP.String(),
+		clients[1].privEndpoint.Port)
+
+	// hacky way to detect local peers and swap local IPs
+	if clients[0].pubEndpoint.IP.String() == clients[1].pubEndpoint.IP.String() {
+		c0pub  = fmt.Sprintf("peerPrivateEndpoint:%s:%d",
+			clients[0].pubEndpoint.IP.String(),
+			clients[0].pubEndpoint.Port,)
+		c0priv = fmt.Sprintf("peerPublicEndpoint:%s:%d",
+			clients[0].privEndpoint.IP.String(),
+			clients[0].privEndpoint.Port)
+		c1pub  = fmt.Sprintf("peerPrivateEndpoint:%s:%d",
+			clients[1].pubEndpoint.IP.String(),
+			clients[1].pubEndpoint.Port)
+		c1priv = fmt.Sprintf("peerPublicEndpoint:%s:%d",
+			clients[1].privEndpoint.IP.String(),
+			clients[1].privEndpoint.Port)
+	} 
 
 	conn.WriteToUDP([]byte(c1pub), &clients[0].pubEndpoint)	
 	conn.WriteToUDP([]byte(c1priv), &clients[0].pubEndpoint)	

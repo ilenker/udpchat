@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"net"
+	"log"
 	"bufio"
 	"strings"
 	"golang.org/x/term"
@@ -35,29 +36,37 @@ func main() {
 		Port: 55585,
 	}
 
-	Debug = false
+	Debug = true
 
-	sPort := "50001"
-	dPort := "50002"
+	//sPort := "50001"
+	//dPort := "50002"
 
 
-	laddr, err := net.ResolveUDPAddr("udp4", "0.0.0.0:" + sPort)
+	//laddr, err := net.ResolveUDPAddr("udp4", "0.0.0.0:" + sPort)
+	localIP := GetOutboundIP()
+	laddr, err := net.ResolveUDPAddr("udp4", localIP.String() + ":0")
 	if err != nil { fmt.Printf("(rdv)address parse failed: %v\n", err) }
+
+	// Send packet to RDV with no sPort - allow OS to choose
+
+	// Get that port that we used just now and save it.
 
 	 // Bound Source Port (Listen)
 	rdvConn, err := net.ListenUDP("udp4", laddr)
-	if err != nil { fmt.Printf("(rdv)binding failed: %v\n", err); return }
+	if err != nil {
+		fmt.Printf("(rdv)binding failed: %v\n", err)
+		rdvConn.Close()
+		return
+	}
 
-	peerPubIP, _ := waitForRdvReply(rdvConn, rdvAddr)
+	peerPubIP, _ := waitForRdvReply(rdvConn, &rdvAddr)
 	
 	// Printing the bytes here really helped reveal why the 
 	// IP didn't parse (I was trying to parse a []byte of size 512,
 	//                  So the IP was padded with zeroes.)
 	// fmt.Printf("bytes: [%v]\n", []byte(peerIP))
 
-	fmt.Printf(" >> Peer found: \t[%s]\n", peerPubIP)
-	fmt.Printf("    source port:\t50001\n")
-	fmt.Printf("    dest port:  \t50002\n")
+	fmt.Printf(" >> Peer found: [%s]\n", peerPubIP)
 
 
 	 // After Server Connect
@@ -66,23 +75,29 @@ func main() {
      // Punch hole
 	fmt.Printf(" >> punching hole\n")
 
-	laddr, err = net.ResolveUDPAddr("udp4", "0.0.0.0:" + sPort)
-	if err != nil { fmt.Printf("(punch)address parse failed: %v\n", err) }
+	//laddr, err = net.ResolveUDPAddr("udp4", "0.0.0.0:" + sPort)
+	//if err != nil { fmt.Printf("(punch)address parse failed: %v\n", err) }
 
-	pconn, err := net.ListenUDP("udp4", laddr)
-	if err != nil { fmt.Printf("(punch)binding failed: %v\n", err) }
+	//pconn, err := net.ListenUDP("udp4", laddr)
+	//if err != nil { fmt.Printf("(punch)binding failed: %v\n", err) }
 
-	premote, err := net.ResolveUDPAddr("udp4", peerPubIP + ":" + dPort)
-	if err != nil { fmt.Printf("(punch)address parse failed: %v\n", err) }
+	//premote, err := net.ResolveUDPAddr("udp4", peerPubIP + ":" + dPort)
+	premote, err := net.ResolveUDPAddr("udp4", peerPubIP)
+	if err != nil {
+		fmt.Printf("(punch)address parse failed: %v\n", err)
+		rdvConn.Close()
+		return
+	}
 
 
 	 // Send packet - From S -> D
 	 // Listening to *all* on port S.
-	pconn.WriteToUDP([]byte("punch"), premote)
-	pconn.Close() // Why do we close here?
+	//pconn.WriteToUDP([]byte("punch"), premote)
+	rdvConn.WriteToUDP([]byte("punch"), premote)
 
 
-	go listenToPort(sPort)  // Pretty sure we just reopen that same port here.
+	go listenToPort(rdvConn)
+
 	fmt.Printf(" >> Listening...\n\n")
 	fmt.Println("--- Ready, set, chat! ---")
 	fmt.Println("---    /q to quit     ---")
@@ -92,33 +107,34 @@ func main() {
 	fmt.Printf("\n> ")
 
 
-	addr, err := net.ResolveUDPAddr("udp4", "0.0.0.0:" + dPort)
-	if err != nil { fmt.Printf("(main)address parse failed: %v\n", err) }
+	//addr, err := net.ResolveUDPAddr("udp4", "0.0.0.0:" + dPort)
+	//if err != nil { fmt.Printf("(main)address parse failed: %v\n", err) }
 
-	conn, err := net.ListenUDP("udp4", addr)
-	if err != nil {
-		fmt.Printf("(main)binding failed: %v\n", err)
-		return
-	}
+	//conn, err := net.ListenUDP("udp4", addr)
+	//if err != nil {
+	//	fmt.Printf("(main)binding failed: %v\n", err)
+		//return
+	//}
 
-	remote, err := net.ResolveUDPAddr("udp4", peerPubIP + ":" + sPort)
-	if err != nil { fmt.Printf("(main)address parse failed: %v\n", err) }
+	//remote, err := net.ResolveUDPAddr("udp4", peerPubIP + ":" + sPort)
+	//remote, err := net.ResolveUDPAddr("udp4", peerPubIP + ":" + sPort)
+	//if err != nil { fmt.Printf("(main)address parse failed: %v\n", err) }
 
 	// Loop sending msgs from stdin
 	for scanner.Scan() {
 		input := scanner.Text()
 		if len(input) == 0 { continue }
 
-		n, err := conn.WriteToUDP([]byte(input), remote)
+		n, err := rdvConn.WriteToUDP([]byte(input), premote)
 		if err != nil { fmt.Printf("(main)sending [%d bytes] failed: %v\n", n, err) }
 
 		if input == "/q" {
-			conn.WriteToUDP([]byte(" >> Peer disconnected"), remote)
-			err := conn.Close()
+			rdvConn.WriteToUDP([]byte(" >> Peer disconnected"), premote)
+			//err := rdvConn.Close()
 			// TODO: add real port info
-			if err != nil {
-				fmt.Printf("(main)could not close connection\nports %s and %s possibly remain bound: %v\n",
-					err, "TODO", "TODO")}
+			//if err != nil {
+			//	fmt.Printf("(main)could not close connection\nports %s and %s possibly remain bound: %v\n",
+			//		err, "TODO", "TODO")}
 			fmt.Printf("\n>> Good bye!\n")
 			restoreTerminal(&termInfo)
 			return
@@ -134,12 +150,12 @@ func main() {
 }
 
 
-func listenToPort(port string) error {
-	laddr, err := net.ResolveUDPAddr("udp4", "0.0.0.0:" + port)
-	if err != nil { fmt.Printf("(listener)parse failed: %v\n", err) }
+func listenToPort(conn *net.UDPConn) error {
+	//laddr, err := net.ResolveUDPAddr("udp4", "0.0.0.0:" + port)
+	//if err != nil { fmt.Printf("(listener)parse failed: %v\n", err) }
 
-	conn, err := net.ListenUDP("udp4", laddr)
-	if err != nil { fmt.Printf("(listener)binding failed: %v\n", err) }
+	//conn, err := net.ListenUDP("udp4", laddr)
+	//if err != nil { fmt.Printf("(listener)binding failed: %v\n", err) }
 
 	defer conn.Close()
 
@@ -164,10 +180,9 @@ func listenToPort(port string) error {
 }
 
 
-func waitForRdvReply(conn *net.UDPConn, rdvAddr net.UDPAddr) (string, string) {
+func waitForRdvReply(conn *net.UDPConn, rdvAddr *net.UDPAddr) (string, string) {
 	peerPublicEndpoint := ""
 	peerPrivateEndpoint := ""
-	defer conn.Close()
 	fmt.Printf(" >> waiting for rendezvous\n")
 
 	b := make([]byte, 65507)
@@ -176,42 +191,34 @@ func waitForRdvReply(conn *net.UDPConn, rdvAddr net.UDPAddr) (string, string) {
     // We need to send the endpoint we believe 
 	// we are using to communicate with the server.
 	privEndpoint := conn.LocalAddr().String()
-	conn.WriteToUDP([]byte(privEndpoint), &rdvAddr)
+	conn.WriteToUDP([]byte(privEndpoint), rdvAddr)
 
 	for {
+		if peerPublicEndpoint != "" && peerPrivateEndpoint != "" {
+			fmt.Printf("if peerPublicEndpoint != \"\" && peerPrivateEndpoint != \"\"\n")
+			return peerPublicEndpoint, peerPrivateEndpoint
+		}
+
 		n, _, err := conn.ReadFromUDP(b)
 		if err != nil { fmt.Printf("(rdv-reply)read error: %v\n", err) }
 
 		//fmt.Printf(" >> Rendezvous replied: %s\n", string(b[:n]))
 
 		if len(b) > 1 {
-
-			if peerPublicEndpoint != "" && peerPrivateEndpoint != "" {
-				return peerPublicEndpoint, peerPrivateEndpoint
-			}
+			fmt.Printf("if len(b) > 1\n")
 
 			data, found := strings.CutPrefix(string(b[:n]), "peerPublicEndpoint:")
+			fmt.Printf("####")
 			if found {
-				addr, err := net.ResolveUDPAddr(conn.RemoteAddr().Network(), data)	
-
-				if err != nil {
-				 	fmt.Printf("(rdv-reply)read error: %v\n", err)
-					return "not", "good"
-				}
-
-				peerPublicEndpoint = addr.String()
+				fmt.Printf("if found { PUB\n")
+				peerPublicEndpoint = data
 				continue
 			}
 
 			data, found = strings.CutPrefix(string(b[:n]), "peerPrivateEndpoint:") 
 			if found {
-				addr, err := net.ResolveUDPAddr( conn.RemoteAddr().Network(), data)	
-				if err != nil {
-					fmt.Printf("(rdv-reply)read error: %v\n", err)
-					return "not", "good"
-				}
-
-				peerPrivateEndpoint = addr.String()
+				fmt.Printf("if found { PRIV\n")
+				peerPrivateEndpoint = data
 			}
 
 		}
@@ -248,4 +255,17 @@ func initTerminal(termInfo *TermInfo) {
 
 func restoreTerminal(t *TermInfo) {
 	term.Restore(t.fd, t.oldState)
+}
+
+func GetOutboundIP() net.IP {
+    conn, err := net.Dial("udp", "8.8.8.8:80")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer conn.Close()
+
+
+    localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+    return localAddr.IP
 }
